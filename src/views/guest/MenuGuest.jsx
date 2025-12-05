@@ -13,13 +13,17 @@ export default function MenuGuest() {
   // --- FUNGSI HELPER GAMBAR PINTAR ---
   const getImageUrl = (image) => {
     if (!image) return 'https://via.placeholder.com/400x300?text=No+Image';
-    // Jika link dari Cloudinary (http...), pakai langsung.
+    
+    // 1. Jika link dari Cloudinary (http...), pakai langsung
     if (image.startsWith('http')) return image;
     
-    // Jika file lama, ambil dari root URL backend
+    // 2. Jika Gambar Lama (Legacy), ambil dari server backend
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
-    const rootUrl = baseUrl.replace('/api', ''); 
-    return `${rootUrl}/gambar/${image}`;
+    // Hapus '/api' di ujung URL
+    const rootUrl = baseUrl.replace(/\/api\/?$/, ''); 
+    
+    // PENTING: encodeURIComponent mengubah spasi menjadi %20
+    return `${rootUrl}/gambar/${encodeURIComponent(image)}`;
   };
 
   useEffect(() => {
