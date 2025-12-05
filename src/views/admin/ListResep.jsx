@@ -48,14 +48,14 @@ export default function ListResep() {
       });
   };
 
-  // --- FUNGSI HELPER UNTUK URL ---
+  // --- UPDATE FUNGSI INI ---
   const getImageUrl = (filename) => {
     if (!filename) return 'https://via.placeholder.com/150?text=No+Image';
     if (filename.startsWith('http')) return filename;
     
     const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
-    const rootUrl = baseUrl.replace('/api', ''); 
-    return `${rootUrl}/gambar/${filename}`;
+    const rootUrl = baseUrl.replace(/\/api\/?$/, '');
+    return `${rootUrl}/gambar/${encodeURIComponent(filename)}`;
   };
 
   const [confirmOpen, setConfirmOpen] = useState(false);
