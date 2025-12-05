@@ -47,7 +47,7 @@ export default function ResepForm() {
             gambar: null
         });
         if (d.gambar) {
-            // PERBAIKAN DI SINI (TAMBAH ENCODE)
+            // PERBAIKAN DI SINI
             if (d.gambar.startsWith('http')) {
                 setImagePreview(d.gambar);
             } else {
