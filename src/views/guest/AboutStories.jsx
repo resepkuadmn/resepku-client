@@ -8,7 +8,11 @@ export default function AboutStories() {
   // --- HELPER URL ---
   const getImageUrl = (image) => {
     if (!image) return 'https://via.placeholder.com/300?text=No+Image';
-    return image.startsWith('http') ? image : `http://127.0.0.1:8000/gambar/${image}`;
+    if (image.startsWith('http')) return image;
+    
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+    const rootUrl = baseUrl.replace('/api', ''); 
+    return `${rootUrl}/gambar/${image}`;
   };
 
   useEffect(() => {

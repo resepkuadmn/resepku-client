@@ -1,137 +1,189 @@
-import { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
 import { useStateContext } from "../../contexts/ContextProvider";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import axiosClient from "../../axios-client";
-import ConfirmModal from '../../components/ConfirmModal';
 
-export default function ListAbout() {
-  const [abouts, setAbouts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const location = useLocation();
+export default function ResepForm() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  
+  const [resep, setResep] = useState({
+    judul: '',
+    jenis: '',
+    waktu: '',
+    porsi: '',
+    bahan: '',
+    cara_membuat: '',
+    gambar: null
+  });
+  
+  const [imagePreview, setImagePreview] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState(null);
+  const fileInputRef = useRef();
   const { showToast } = useStateContext();
+  const [submitting, setSubmitting] = useState(false);
 
-  // --- HELPER ---
-  const getImageUrl = (image) => {
-    if (!image) return 'https://via.placeholder.com/150?text=No+Image';
-    return image.startsWith('http') ? image : `http://127.0.0.1:8000/gambar/${image}`;
+  const htmlToText = (html) => {
+    if (!html) return "";
+    return html.replace(/<\/?li>/g, "\n").replace(/<\/?ul>/g, "").trim().split("\n").filter(r => r.trim() !== "").join("\n");
   };
 
-  const getAbouts = () => {
-    setLoading(true);
-    axiosClient.get('/about')
-      .then(({ data }) => {
-        setAbouts(data.data);
+  const textToHtml = (text) => {
+    if (!text) return "";
+    return text.split("\n").map(line => line.trim()).filter(line => line !== "").map(line => `<li>${line}</li>`).join("");
+  };
+
+  useEffect(() => {
+    if (id) {
+      setLoading(true);
+      axiosClient.get(`/resep/${id}`).then(({ data }) => {
         setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
+        const d = data.data;
+        setResep({
+            ...d,
+            bahan: htmlToText(d.bahan),
+            cara_membuat: htmlToText(d.cara_membuat),
+            gambar: null
+        });
+        if (d.gambar) {
+            // Perbaikan URL Preview
+            if (d.gambar.startsWith('http')) {
+                setImagePreview(d.gambar);
+            } else {
+                const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+                const rootUrl = baseUrl.replace('/api', ''); 
+                setImagePreview(`${rootUrl}/gambar/${d.gambar}`);
+            }
+        }
       });
-  };
-
-  useEffect(() => {
-    getAbouts();
-  }, []);
-
-  useEffect(() => {
-    if (location && location.state && location.state.toast) {
-      const t = location.state.toast;
-      if (typeof showToast === 'function') {
-        showToast(t.message, { type: t.type || 'success' });
-      }
-      navigate(location.pathname, { replace: true, state: {} });
-      getAbouts();
+    } else {
+      setImagePreview(null);
+      setResep({
+        judul: '',
+        jenis: '',
+        waktu: '',
+        porsi: '',
+        bahan: '',
+        cara_membuat: '',
+        gambar: null
+      });
     }
-  }, [location, navigate, showToast]);
+  }, [id]);
 
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [targetId, setTargetId] = useState(null);
-  const [successMsg, setSuccessMsg] = useState(null);
-
-  const openDeleteConfirm = (id) => {
-    setTargetId(id);
-    setConfirmOpen(true);
-  }
-
-  const handleConfirmDelete = () => {
-    if (!targetId) return;
-    axiosClient.delete(`/about/${targetId}`)
-      .then(() => {
-        setSuccessMsg('Data berhasil dihapus');
-        setConfirmOpen(false);
-        setTargetId(null);
-        getAbouts();
-        setTimeout(() => setSuccessMsg(null), 2500);
-      })
-      .catch(() => {
-        setConfirmOpen(false);
-        setTargetId(null);
-      });
+  const onImageClick = () => fileInputRef.current.click();
+  
+  const onImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        setResep({ ...resep, gambar: file });
+        setImagePreview(URL.createObjectURL(file));
+    }
   };
+
+  const onSubmit = (ev) => {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    showToast && showToast('Mengirim...', { type: 'success', duration: 800 });
+    const payload = new FormData();
+    payload.append('judul', resep.judul);
+    payload.append('jenis', resep.jenis);
+    payload.append('waktu', resep.waktu);
+    payload.append('porsi', resep.porsi);
+    payload.append('bahan', textToHtml(resep.bahan));
+    payload.append('cara_membuat', textToHtml(resep.cara_membuat));
+    if (resep.gambar instanceof File) payload.append('gambar', resep.gambar);
+
+    axiosClient.post(id ? `/resep/${id}` : '/resep', payload)
+      .then(() => {
+        navigate('/admin/resep', { state: { toast: { message: 'Data Berhasil Disimpan!', type: 'success' } } });
+      })
+      .catch(err => {
+        if (err.response && err.response.status === 422) {
+          setErrors(err.response.data.errors);
+        } else {
+          const serverMsg = err?.response?.data?.message || 'Gagal menyimpan data.';
+          if (typeof showToast === 'function') showToast(serverMsg, { type: 'error' });
+          else alert(serverMsg);
+        }
+      })
+      .finally(() => setSubmitting(false));
+  };
+
+  const inputClass = "w-full p-3 rounded-xl border-2 border-[#3a2e1c] bg-[#e6a357] text-[#3a2e1c] placeholder-[#3a2e1c]/70 font-medium focus:outline-none focus:ring-2 focus:ring-[#3a2e1c] transition";
+  const labelClass = "block font-bold text-[#3a2e1c] mb-2 text-sm";
 
   return (
-    <div className="p-6 animate-fade-in-up">
-      <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-resepku-dark font-serif">Daftar About</h1>
-          <Link to="/admin/about/create" className="bg-resepku-brown text-white px-4 py-2 rounded-md font-bold hover:bg-black transition shadow-md">
-            + Tambah About
-          </Link>
-      </div>
+    <div className="max-w-3xl mx-auto p-8 bg-white rounded-lg shadow-sm mt-6 animate-fade-in-up pb-20">
+      <h1 className="text-3xl font-bold text-[#333] mb-6 font-serif border-b border-gray-200 pb-4">
+        {id ? 'Edit Resep' : 'Tambah Resep'}
+      </h1>
 
-      <div className="bg-resepku-orange rounded-lg overflow-hidden shadow-lg">
-        <table className="w-full text-left border-collapse">
-            <thead>
-                <tr className="bg-resepku-orange text-resepku-dark border-b-2 border-white">
-                    <th className="p-4 font-bold w-16">No</th>
-                    <th className="p-4 font-bold w-32">Gambar</th>
-                    <th className="p-4 font-bold">Judul</th>
-                    <th className="p-4 font-bold">Deskripsi Singkat</th>
-                    <th className="p-4 font-bold w-48">Aksi</th>
-                </tr>
-            </thead>
-            <tbody className="bg-white">
-                {loading && (
-                    <tr><td colSpan="5" className="text-center p-8 text-gray-500">Memuat data...</td></tr>
-                )}
-                {!loading && abouts.length === 0 && (
-                    <tr><td colSpan="5" className="text-center p-8 text-gray-500">Belum ada data About.</td></tr>
-                )}
-                {!loading && abouts.map((item, index) => (
-                    <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="p-4">{index + 1}</td>
-                        <td className="p-4">
-                             <div className="w-16 h-16 bg-gray-200 rounded-full overflow-hidden border-2 border-resepku-orange shadow-sm">
-                                <img 
-                                    src={getImageUrl(item.gambar)} 
-                                    alt={item.judul} 
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => e.target.src = 'https://via.placeholder.com/150?text=Error'}
-                                />
-                            </div>
-                        </td>
-                        <td className="p-4 font-bold text-resepku-dark">{item.judul}</td>
-                        <td className="p-4 text-sm text-gray-600">
-                            {item.deskripsi.length > 60 ? item.deskripsi.substring(0, 60) + '...' : item.deskripsi}
-                        </td>
-                        <td className="p-4 flex gap-2">
-                            <Link to={`/admin/about/edit/${item.id}`} className="bg-resepku-orange text-white px-3 py-1 rounded font-bold text-sm hover:opacity-80 transition">
-                                Edit
-                            </Link>
-                            <button onClick={() => openDeleteConfirm(item.id)} className="bg-red-600 text-white px-3 py-1 rounded font-bold text-sm hover:bg-red-700 transition">
-                                Hapus
-                            </button>
-                        </td>
-                    </tr>
-                ))}
-            </tbody>
-        </table>
-      </div>
-      {successMsg && (
-        <div className="fixed top-6 right-6 z-50 bg-green-100 text-green-800 px-4 py-2 rounded shadow">
-          {successMsg}
-        </div>
+      {loading ? <div className="text-center py-10">Loading...</div> : (
+        <form onSubmit={onSubmit} className="space-y-6">
+          <div className="flex flex-col items-center gap-4 mb-8">
+              {imagePreview && (
+                  <div className="text-center">
+                      <p className="text-xs font-bold text-gray-500 mb-2">Gambar Saat Ini:</p>
+                      <img 
+                        src={imagePreview} 
+                        alt="Preview" 
+                        className="w-40 h-28 object-cover rounded-lg border-2 border-gray-300 shadow-sm mx-auto"
+                        onError={(e) => e.target.src = 'https://via.placeholder.com/150?text=No+Image'} 
+                      />
+                  </div>
+              )}
+              <div onClick={onImageClick} className="w-40 h-32 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-100 transition text-center p-2">
+                  <i className="fas fa-camera text-2xl text-gray-400 mb-2"></i>
+                  <span className="text-xs font-bold text-gray-500">Klik untuk Ganti Foto</span>
+                  <input type="file" ref={fileInputRef} className="hidden" onChange={onImageChange} />
+              </div>
+              {errors?.gambar && <p className="text-red-500 text-xs">{errors.gambar[0]}</p>}
+          </div>
+
+          <div>
+              <label className={labelClass}>Nama Menu:</label>
+              <input type="text" value={resep.judul} onChange={e => setResep({...resep, judul: e.target.value})} className={inputClass} />
+          </div>
+
+          <div className="relative">
+              <label className={labelClass}>Kategori:</label>
+              <select value={resep.jenis} onChange={e => setResep({...resep, jenis: e.target.value})} className={`${inputClass} appearance-none cursor-pointer`}>
+                  <option value="" disabled>Pilih Kategori</option>
+                  <option value="makanan">Makanan</option>
+                  <option value="minuman">Minuman</option>
+                  <option value="dessert">Dessert</option>
+              </select>
+              <i className="fas fa-caret-down absolute right-4 top-[45px] text-[#3a2e1c] text-xl pointer-events-none"></i>
+          </div>
+
+          <div>
+              <label className={labelClass}>Waktu Memasak:</label>
+              <input type="text" value={resep.waktu} onChange={e => setResep({...resep, waktu: e.target.value})} className={inputClass} />
+          </div>
+
+          <div>
+              <label className={labelClass}>Porsi:</label>
+              <input type="text" value={resep.porsi} onChange={e => setResep({...resep, porsi: e.target.value})} className={inputClass} />
+          </div>
+
+          <div>
+              <label className={labelClass}>Bahan-Bahan (Satu baris satu item):</label>
+              <textarea rows="6" value={resep.bahan} onChange={e => setResep({...resep, bahan: e.target.value})} className={inputClass}></textarea>
+          </div>
+
+          <div>
+              <label className={labelClass}>Cara Membuat (Satu baris satu langkah):</label>
+              <textarea rows="8" value={resep.cara_membuat} onChange={e => setResep({...resep, cara_membuat: e.target.value})} className={inputClass}></textarea>
+          </div>
+
+          <div className="flex justify-between pt-6">
+               <Link to="/admin/resep" className="bg-gray-500 text-white font-bold py-3 px-8 rounded-lg hover:bg-gray-600 transition">Batal</Link>
+               <button type="button" onClick={() => onSubmit()} disabled={submitting} className={`bg-[#3a2e1c] text-white font-bold py-3 px-10 rounded-lg hover:bg-black transition shadow-md ${submitting ? 'opacity-60 cursor-not-allowed' : ''}`}>{submitting ? 'Mengirim...' : 'Simpan'}</button>
+          </div>
+        </form>
       )}
-      <ConfirmModal open={confirmOpen} title="Yakin ingin menghapus ini?" message="Data yang dipilih akan dihapus" confirmLabel="Hapus" cancelLabel="Batal" onConfirm={handleConfirmDelete} onCancel={() => { setConfirmOpen(false); setTargetId(null); }} />
     </div>
   );
 }

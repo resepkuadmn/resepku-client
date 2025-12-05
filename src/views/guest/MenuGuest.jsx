@@ -10,11 +10,16 @@ export default function MenuGuest() {
   const [searchParams] = useSearchParams();
   const searchQuery = searchParams.get('q') || ''; 
 
-  // --- FUNGSI HELPER BARU ---
+  // --- FUNGSI HELPER GAMBAR PINTAR ---
   const getImageUrl = (image) => {
     if (!image) return 'https://via.placeholder.com/400x300?text=No+Image';
-    // Jika sudah ada http/https (Cloudinary), pakai langsung. Jika belum (Legacy), tambah base url.
-    return image.startsWith('http') ? image : `http://127.0.0.1:8000/gambar/${image}`;
+    // Jika link dari Cloudinary (http...), pakai langsung.
+    if (image.startsWith('http')) return image;
+    
+    // Jika file lama, ambil dari root URL backend
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+    const rootUrl = baseUrl.replace('/api', ''); 
+    return `${rootUrl}/gambar/${image}`;
   };
 
   useEffect(() => {
@@ -40,7 +45,6 @@ export default function MenuGuest() {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 font-montserrat">
-      
       {!searchQuery && (
         <div className="flex flex-wrap justify-center gap-6 mb-12 animate-fade-in-up">
             <button onClick={() => setFilter('makanan')} className={`w-48 h-24 rounded-xl flex flex-col items-center justify-center shadow-md transition-transform hover:-translate-y-1 ${filter === 'makanan' ? 'bg-[#d58f3c] scale-105' : 'bg-[#e6a357]'}`}>
@@ -88,7 +92,6 @@ export default function MenuGuest() {
                     className="bg-white rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.08)] overflow-hidden hover:-translate-y-2 transition duration-300 border border-gray-100 block"
                 >
                     <div className="relative h-56 overflow-hidden">
-                        {/* --- PERBAIKAN DI SINI --- */}
                         <img 
                             src={getImageUrl(resep.gambar)} 
                             alt={resep.judul} 

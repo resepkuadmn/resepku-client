@@ -41,8 +41,13 @@ export default function TipsForm() {
             gambar: null
         });
         if (d.gambar) {
-            const url = d.gambar.startsWith('http') ? d.gambar : `http://127.0.0.1:8000/gambar/${d.gambar}`;
-            setImagePreview(url);
+            if (d.gambar.startsWith('http')) {
+                setImagePreview(d.gambar);
+            } else {
+                const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+                const rootUrl = baseUrl.replace('/api', ''); 
+                setImagePreview(`${rootUrl}/gambar/${d.gambar}`);
+            }
         }
       });
     } else {

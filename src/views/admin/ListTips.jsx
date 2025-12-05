@@ -65,7 +65,11 @@ export default function ListTips() {
 
   const getImageUrl = (filename) => {
     if (!filename) return 'https://via.placeholder.com/150?text=No+Image';
-    return filename.startsWith('http') ? filename : `http://127.0.0.1:8000/gambar/${filename}`;
+    if (filename.startsWith('http')) return filename;
+    
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+    const rootUrl = baseUrl.replace('/api', ''); 
+    return `${rootUrl}/gambar/${filename}`;
   }
 
   return (
