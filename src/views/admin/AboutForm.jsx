@@ -29,13 +29,14 @@ export default function AboutForm() {
           setDeskripsi(d.deskripsi);
           setLayout(d.layout || "kiri");
           if (d.gambar) {
-            if (d.gambar.startsWith('http')) {
-                setImagePreview(d.gambar);
-            } else {
-                const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
-                const rootUrl = baseUrl.replace('/api', ''); 
-                setImagePreview(`${rootUrl}/gambar/${d.gambar}`);
-            }
+             // PERBAIKAN DI SINI
+             if (d.gambar.startsWith('http')) {
+                 setImagePreview(d.gambar);
+             } else {
+                 const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
+                 const rootUrl = baseUrl.replace(/\/api\/?$/, '');
+                 setImagePreview(`${rootUrl}/gambar/${encodeURIComponent(d.gambar)}`);
+             }
           }
         })
         .catch(() => {
